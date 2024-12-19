@@ -87,13 +87,13 @@ cd..
 
 ```
 # mp4 file
-python run.py --input example/input/test.mp4 --output example/output --save_results True --smooth True
+python run.py --input example/input/test.mp4 --output example/output --save_results True --smooth True --save_ply False
 # image file
-python run.py --input example/input/test.jpg --output example/output --save_results True --smooth False
+python run.py --input example/input/test.jpg --output example/output --save_results True --smooth False --save_ply False
 # image folder
-python run.py --input example/input/imagefolder --output example/output --save_results True --smooth False
+python run.py --input example/input/imagefolder --output example/output --save_results True --smooth False --save_ply False
 # online face tracking with the webcamera
-python run.py --input webcam --save_results False --smooth True
+python run.py --input webcam --save_results False --smooth True --save_ply False
 ```
 
 ## Citation
