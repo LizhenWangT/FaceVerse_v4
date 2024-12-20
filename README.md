@@ -41,7 +41,7 @@ For x, y, z axes, orienting the face in 3D space, determining pitch, yaw, and ro
 2 for x, y translation and 1 for z (also handling scale in perspective projection).
 
 ## Eye Ball Rotations (4)
-x, y for left and x, y for right eyes, defining eye orientations.
+y, x rotation for left and y, x rotation for right eyes, defining eye orientations.
 ```
 
 ## Performance
@@ -65,7 +65,7 @@ The overall time consumption mainly includes the time for reading data, mediapip
 1. You need to download the following three files and place them in the `data/` folder:
 
 - **FaceVerse version 4 model**: [[faceverse_v4_2.npy]](https://1drv.ms/u/c/b8eab7b1820a6fa4/EWJOsgGxPMZDkl8xJ_QZB30BpcjNoMVGK9mnUPq5n9-lyw?e=4GvEs9)
-- **FaceVerse version 4 network**: [[faceverse_resnet50.pth]](https://1drv.ms/u/c/b8eab7b1820a6fa4/EcgUCYq20NhIqx-pGjnzDxkBfh9kMTtEn4G5UcOaHvwW4Q?e=eQnX64)
+- **FaceVerse version 4 network**: [[faceverse_resnet50.pth]](https://1drv.ms/u/c/b8eab7b1820a6fa4/ETfT_C9Oz1FFlykJdtj3h6MBR1KvQb5BYwesxFykH-7BZA?e=7ti1yj)
 - **mediapipe face_landmarker.task**: [[face_landmarker.task]](https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task)
 
 

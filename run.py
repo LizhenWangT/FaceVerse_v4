@@ -14,6 +14,14 @@ from mediapipe.tasks.python import vision
 stop_flag = False
 
 
+def distance(x, y):
+    return np.sqrt(((x - y) ** 2).sum())
+
+
+def norm(x):
+    return x / np.sqrt((x ** 2).sum())
+
+
 class FrameLoader(threading.Thread):
     def __init__(self, args):
         super().__init__()
@@ -60,7 +68,13 @@ class FrameLoader(threading.Thread):
             lms = np.array([(lmk.x, lmk.y) for lmk in lms])
             lms[:, 0] = lms[:, 0] * img.shape[1]
             lms[:, 1] = lms[:, 1] * img.shape[0]
-        return [[np.min(lms[:, 0]), np.min(lms[:, 1]), np.max(lms[:, 0]), np.max(lms[:, 1])]]
+            vec_norm = norm(lms[362, :2] - lms[263, :2])
+            leyex = np.dot(lms[473] - (lms[263, :2] + lms[362, :2]) / 2, vec_norm) / distance(lms[362, :2], lms[263, :2]) * 3
+            leyey = np.dot(lms[473] - (lms[263, :2] + lms[362, :2]) / 2, vec_norm[[1, 0]]) / distance(lms[362, :2], lms[263, :2]) * -1.5
+            vec_norm = norm(lms[33, :2] - lms[133, :2])
+            reyex = np.dot(lms[468] - (lms[33, :2] + lms[133, :2]) / 2, vec_norm) / distance(lms[33, :2], lms[133, :2]) * 3
+            reyey = np.dot(lms[468] - (lms[33, :2] + lms[133, :2]) / 2, vec_norm[[1, 0]]) / distance(lms[33, :2], lms[133, :2]) * -1.5
+        return [[np.min(lms[:, 0]), np.min(lms[:, 1]), np.max(lms[:, 0]), np.max(lms[:, 1])], [leyey, leyex, reyey, reyex]]
 
     def _determine_mode(self):
         if self.args.input.endswith('.mp4') or self.args.input.endswith('.MP4') or self.args.input.endswith('.avi'):
@@ -203,9 +217,13 @@ end_header\n'''.format(num_points, num_triangles)
 def process_one_batch(args, frameloader, fvr, box_batch, frame_batch, name_batch, cache_frame, cache_param, end=False):
     if len(name_batch) > 0:
         box_batch = np.stack(box_batch)
+        eye_batch = box_batch[:, 1]
+        box_batch = box_batch[:, 0:1]
         frame_batch = np.stack(frame_batch)
 
         coeffs, bbox_list = fvr.process_imgs(frame_batch, box_batch)
+        # force to get pupil pos from mediapipe
+        coeffs[:, -4:] = torch.from_numpy(eye_batch).to(coeffs.device)
         # a second forward for smooth bbox
         # _, vs_proj, _, _ = fvr.from_coeffs(coeffs, bbox_list)
         # lms = vs_proj[:, fvr.fvd['keypoints']]
@@ -289,6 +307,9 @@ def process_one_batch(args, frameloader, fvr, box_batch, frame_batch, name_batch
                         exit()
                 cache_param.pop(0)
                 cache_frame.pop(0)
+            while len(cache_param) > 0:
+                cache_param.pop(0)
+                cache_frame.pop(0)
 
 
 def run(args, fvr):
@@ -327,7 +348,8 @@ def run(args, fvr):
             continue
         
         if len(boxes) > 0:
-            box = np.array(boxes).astype(np.int32)[0, :4]
+            box = np.array(boxes).astype(np.float32)[0, :4]
+            eyes = np.array(boxes).astype(np.float32)[1, :4]
 
             width = box[2] - box[0]
             height = box[3] - box[1]
@@ -340,27 +362,27 @@ def run(args, fvr):
             box[3] = center_y + side_length // 2
 
             if args.smooth:
-                box_buffer.append(box)
+                box_buffer.append(np.stack([box, eyes]))
                 frame_buffer.append(frame)
                 name_buffer.append(frame_name)
                 if len(box_buffer) > 3:
                     box_buffer.pop(0)
                     frame_buffer.pop(0)
                     name_buffer.pop(0)
-                smoothed_box = np.mean(box_buffer, axis=0).astype(np.int32) if len(box_buffer) == 3 else box_buffer[0]
+                smoothed_box = np.mean(box_buffer, axis=0) if len(box_buffer) == 3 else box_buffer[0]
                 frame_this = frame_buffer[1] if len(box_buffer) > 1 else frame_buffer[0]
                 name_this = name_buffer[1] if len(box_buffer) > 1 else name_buffer[0]
             else:
-                smoothed_box = box
+                smoothed_box = np.stack([box, eyes])
                 frame_this = frame
                 name_this = frame_name
 
             if len(box_batch) < args.batch:
-                box_batch.append(smoothed_box[None, :])
+                box_batch.append(smoothed_box)
                 frame_batch.append(frame_this)
                 name_batch.append(name_this)
             else:
-                box_batch.append(smoothed_box[None, :])
+                box_batch.append(smoothed_box)
                 frame_batch.append(frame_this)
                 name_batch.append(name_this)
                 process_one_batch(args, frameloader, fvr, box_batch, frame_batch, name_batch, cache_frame, cache_param)
@@ -372,7 +394,7 @@ def run(args, fvr):
                 smoothed_box = box_buffer[-1]
                 frame_this = frame_buffer[-1]
                 name_this = name_buffer[-1]
-                box_batch.append(smoothed_box[None, :])
+                box_batch.append(smoothed_box)
                 frame_batch.append(frame_this)
                 name_batch.append(name_this)
                 process_one_batch(args, frameloader, fvr, box_batch, frame_batch, name_batch, cache_frame, cache_param, end=True)
@@ -401,7 +423,7 @@ def run(args, fvr):
         smoothed_box = box_buffer[-1]
         frame_this = frame_buffer[-1]
         name_this = name_buffer[-1]
-        box_batch.append(smoothed_box[None, :])
+        box_batch.append(smoothed_box)
         frame_batch.append(frame_this)
         name_batch.append(name_this)
 

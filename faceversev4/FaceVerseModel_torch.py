@@ -161,15 +161,36 @@ class FaceVerseModel_torch:
 
         return vs_t + self.cameraT.view(-1, 1, 3), colors, colors_illumin, self.get_lms(vs_proj)[:, :, :2]
     
+    def adjust_mouth(self, x):
+        mask_1 = (x > 0.45) | (x < 0)
+        mask_2 = (x > 0.25) & (x <= 0.45)
+        result_1 = x.clone()
+        result_2 = 1.5 * (x - 0.25) + 0.15
+        result_3 = x * 0.6
+        result = torch.where(mask_1, result_1, torch.where(mask_2, result_2, result_3))
+        return result
+    
+    def adjust_eyes(self, x):
+        mask_1 = (x < 0.0)
+        mask_2 = (x < 0.15)
+        mask_3 = (x < 0.3)
+        result_1 = x.clone()
+        result_2 = 1.5 * x
+        result_3 = 3 * (x - 0.15) + 0.225
+        result_4 = 10 * (x - 0.3) + 0.675
+        result = torch.where(mask_1, result_1, torch.where(mask_2, result_2, 
+                            torch.where(mask_3, result_3, result_4)))
+        result = torch.clip(result, -1, 1)
+        return result
+    
     def compute_for_final(self, coeffs, compute_color=True):
         id_coeff, exp_coeff, tex_coeff, lighting, angles, translation, eye_coeff = self.split_coeffs(coeffs)
         rotation = self.compute_rotation_matrix(angles)
         exp_coeff_ = exp_coeff.clone()
         # for better eye closing
-        target_part = exp_coeff_[:, 14:16]
-        target_part[target_part > 0.0] *= 2
-        target_part[target_part > 1] = 1
-        exp_coeff_[:, 14:16] = target_part
+        exp_coeff_[:, 14:16] = self.adjust_eyes(exp_coeff_[:, 14:16])
+        # for better mouth closing
+        exp_coeff_[:, 49:50] = self.adjust_mouth(exp_coeff_[:, 49:50])
 
         vs = self.get_vs(id_coeff, exp_coeff_, eye_coeff)
         vs_t = self.rigid_transform(vs, rotation, translation)
